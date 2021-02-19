@@ -19,7 +19,6 @@ import data_helper_word
 os.environ["CUDA_VISIBLE_DEVICES"] = "4,5"
 
 config = tf.ConfigProto()
-# config.gpu_options.per_process_gpu_memory_fraction = 0.8  # 使用GPU显存的比率
 config.gpu_options.allow_growth = True
 sess = tf.Session(config=config)
 
@@ -86,10 +85,8 @@ class Attention(Layer):
         super(Attention, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        #input_shape:[(batch_size,max_step,2 * encoder_size),(batch_size,max_step,2 * encoder_size)]
         assert isinstance(input_shape, list)
 
-        # Dot Attention,Wd共享参数
         self.Wd = self.add_weight(name='Wd',
                                   shape=(input_shape[0][2], 1),
                                   initializer='uniform',
@@ -100,17 +97,16 @@ class Attention(Layer):
                                   trainable=True)
 
 
-        super(Attention, self).build(input_shape)  # 一定要在最后调用它
+        super(Attention, self).build(input_shape) 
 
     def call(self, x):
         q_sentence_output, p_sentence_output = x
 
-        # Dot Attention,Wd共享参数
         q_p_dot = tf.expand_dims(q_sentence_output, axis=1) * tf.expand_dims(p_sentence_output, axis=2)
-        sd = tf.multiply(tf.tanh(K.dot(q_p_dot, self.Wd)), self.vd)  # (batch_size,max_step,max_step)
+        sd = tf.multiply(tf.tanh(K.dot(q_p_dot, self.Wd)), self.vd)  
         sd = tf.squeeze(sd, axis=-1)
-        ad = tf.nn.softmax(sd)  # 按列softmax，(batch_size,max_step,max_step)
-        qd = K.batch_dot(ad, q_sentence_output)  # shape:(batch_size,max_step,2 * encoder_size)
+        ad = tf.nn.softmax(sd)  
+        qd = K.batch_dot(ad, q_sentence_output) 
 
         return [qd]
 
@@ -124,10 +120,7 @@ class self_Attention(Layer):
         super(self_Attention, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        #input_shape:[(batch_size,max_step,2 * encoder_size),(batch_size,max_step,2 * encoder_size)]
-        # assert isinstance(input_shape)
 
-        # Dot Attention,Wd共享参数
         self.Wd = self.add_weight(name='Wd',
                                   shape=(input_shape[2], 1),
                                   initializer='uniform',
@@ -138,16 +131,15 @@ class self_Attention(Layer):
                                   trainable=True)
 
 
-        super(self_Attention, self).build(input_shape)  # 一定要在最后调用它
+        super(self_Attention, self).build(input_shape)  
 
     def call(self, x):
         sentence_output= x
 
-        # Dot Attention,Wd共享参数
-        sd = tf.multiply(tf.tanh(K.dot(sentence_output, self.Wd)), self.vd)  # (batch_size,max_step,max_step)
+        sd = tf.multiply(tf.tanh(K.dot(sentence_output, self.Wd)), self.vd)  
         sd = tf.squeeze(sd, axis=-1)
-        ad = tf.nn.softmax(sd)  # 按列softmax，(batch_size,max_step,max_step)
-        qd = K.batch_dot(ad, sentence_output)  # shape:(batch_size,max_step,2 * encoder_size)
+        ad = tf.nn.softmax(sd)  
+        qd = K.batch_dot(ad, sentence_output)
 
         return [qd]
 
@@ -160,14 +152,14 @@ embedding_layer = Embedding(embedding_matrix.shape[0],
                             emb_dim,
                             weights=[embedding_matrix],
                             input_length=input_dim,
-                            trainable=False)        #mask_zero=True
+                            trainable=False)    
 
 embedding_matrix_word = data_helper_word.load_pickle('./embedding_matrix_word.pkl')
 embedding_layer_word = Embedding(embedding_matrix_word.shape[0],
                             emb_dim,
                             weights=[embedding_matrix_word],
                             input_length=input_dim,
-                            trainable=False)        #mask_zero=True
+                            trainable=False)     
 
 def encoding_moudle(input_shape,params):
     sentence_char = Input(shape=input_shape, dtype='int32')
@@ -191,15 +183,12 @@ def encoding_moudle(input_shape,params):
         sentence_bilstm_word = Reshape((30, 1, params["lstm_dim"], 1))(sentence_next_word)
 
 
-    #从这里往下
         feature_map = Concatenate(axis=2)([sentence_bilstm, sentence_bilstm_word])
         encoded_result.append(feature_map)
 
     feature_map = encoded_result[0]
     for i in range(len(encoded_result)-1):
-        #shape=(?, 30, channel=2, 300, deepth)
         feature_map = Concatenate(axis=4)([feature_map, encoded_result[i+1]])
-    #到这里为止，有两种不同的做法:1.粒度为通道，深度为高度;2.粒度为高度，深度为通道
 
     encode_3DCNN = Conv3D(filters=params["conv3d_dim"], kernel_size=(params["conv3d_kernel_1"], 2, params["conv3d_kernel_3"]),
                   strides=(params["conv3d_stride_1"], 1, params["conv3d_stride_3"]),
@@ -214,24 +203,16 @@ def encoding_moudle(input_shape,params):
 def siamese_model(params):
     input_shape = (input_dim,)
 
-    '''编码模块'''
     encode_moudel = encoding_moudle(input_shape, params)
 
-    '''编码模块结束'''
-
-
-    '''句子1处理过程'''
     q1_input_char = Input(shape=input_shape, dtype='int32', name='sequence1_char')
     q1_input_word = Input(shape=input_shape, dtype='int32', name='sequence1_word')
     q1_feature = encode_moudel([q1_input_char,q1_input_word])
 
-    '''句子2处理过程'''
     q2_input_char = Input(shape=input_shape, dtype='int32', name='sequence2_char')
     q2_input_word = Input(shape=input_shape, dtype='int32', name='sequence2_word')
     q2_feature = encode_moudel([q2_input_char,q2_input_word])
 
-
-    '''匹配过程'''
     similarity = Concatenate(axis=4)([q1_feature, q2_feature])
 
     similarity = Conv3D(filters=params["sim_conv3d_dim"], kernel_size=(params["sim_conv3d_kernel_1"], 1, params["sim_conv3d_kernel_3"]),
@@ -270,8 +251,6 @@ def siamese_model(params):
     return parallel_model
 
 def train(params):
-    # with open('./model_data.pkl', 'rb') as f:
-    #     data = pickle.load(f)
     data = data_helper.load_pickle('./model_data.pkl')
 
     train_q1 = data['train_q1']
@@ -332,8 +311,6 @@ class Logger(object):
         pass
 
 if __name__ == '__main__':
-    # RECEIVED_PARAMS = nni.get_next_parameter()
-    # sys.stdout = Logger('./5.txt')  # 这里我将Log输出到D盘
 
     params63 = {"lstm_dim": 300,
                 "conv3d_dim": 16,
