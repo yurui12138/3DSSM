@@ -2,7 +2,7 @@
 
 #### Sentence Semantic Matching based on 3D CNN for Human-robot Language Interaction
 Wenpeng Lu, Rui Yu, Shoujin Wang, Can Wang, Ping Jian, Heyan Huang  
-The paper has been received by ACM Transaction on Internet Technology.
+The paper has been accepted by ACM Transaction on Internet Technology.
 
 #### Prerequisites
 python 3.6  
@@ -23,4 +23,4 @@ We used two datasets: BQ & LCQMC.
 2. "LCQMC: A Large-scale Chinese Question Matching Corpus", https://www.aclweb.org/anthology/C18-1166/.
 
 ### Note
-Due to the differences between the two data sets, some parameters used by the model in the training of the two data sets are not exactly the consistent. Therefore, we provide two versions of the code.
+Due to the differences between the two data sets, some parameters adopted by 3DSSM are different. Therefore, we provide two versions of the code for the two data sets.
